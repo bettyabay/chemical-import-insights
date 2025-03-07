@@ -41,9 +41,6 @@ This project focuses on analyzing Ethiopian import data for items within HS Code
 3.  **Place Data:** Put your excel file in the same directory as the python scripts.
 4.  **Run the Analysis:**
 
-    ```bash
-    python data_analysis.py
-    ```
 
     (Replace `data_analysis.py` with the name of your main script.)
 
