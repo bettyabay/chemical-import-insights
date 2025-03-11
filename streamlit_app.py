@@ -34,7 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Load data
-data_import = pd.read_csv('C:/Users/USER/Desktop/chemical-import-insights/data/cleaned/cleaned_import_data.csv')
+data_import = pd.read_csv('data/cleaned/cleaned_import_data.csv')
 
 # Sidebar
 with st.sidebar:
