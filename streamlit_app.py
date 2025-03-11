@@ -1,10 +1,12 @@
-# Import libraries
+# Import necessary libraries
 import streamlit as st
 import pandas as pd
+import numpy as np
 import altair as alt
 import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-#######################
 # Page configuration
 st.set_page_config(
     page_title="Chemical Imports, Freight Forwarding, and Logistics",
@@ -13,9 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-alt.themes.enable("dark")
-
-#######################
 # CSS styling
 st.markdown("""
 <style>
@@ -34,44 +33,34 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-#######################
 # Load data
-data_import = pd.read_csv('C:/Users/USER/Desktop/chemical-import-insights/data/cleaned/data_model_for_trainig.csv')
+data_import = pd.read_csv('C:/Users/USER/Desktop/chemical-import-insights/data/cleaned/cleaned_import_data.csv')
 
-#######################
 # Sidebar
 with st.sidebar:
     st.title('🏂 Chemical Imports, Freight Forwarding, and Logistics Dashboard')
     
-    year_list = data_import['Reg. date'].apply(lambda x: x.split('-')[0]).unique()[::-1]
+    # Extract year and month for selection
+    data_import['Reg. date'] = pd.to_datetime(data_import['Reg. date'])
+    year_list = data_import['Reg. date'].dt.year.unique()[::-1]
     selected_year = st.selectbox('Select a year', year_list)
-    
-    # Filter by Trader
-    trader_list = data_import['Trader'].unique()
-    selected_trader = st.selectbox('Select a Trader', trader_list)
-    
-    # Month filter
-    month_list = data_import['Reg. date'].apply(lambda x: x.split('-')[1]).unique()
-    selected_month = st.selectbox('Select a Month', month_list)
-    
+    month_list = data_import['Reg. date'].dt.month.unique()
+    selected_month = st.selectbox('Select a month', month_list)
+
+    # Filter data based on selections
+    df_selected = data_import[(data_import['Reg. date'].dt.year == selected_year) & 
+                              (data_import['Reg. date'].dt.month == selected_month)]
+
+    # Color theme selection
     color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
     selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
 
-#######################
-# Filter Data
-df_selected_year = data_import[data_import['Reg. date'].str.startswith(selected_year)]
-df_selected_trader = df_selected_year[df_selected_year['Trader'] == selected_trader]
-df_selected_month = df_selected_trader[df_selected_trader['Reg. date'].str.contains(f'-{selected_month}-')]
-
-#######################
 # Plots
-
-# Heatmap
 def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     heatmap = alt.Chart(input_df).mark_rect().encode(
-        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Month", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
-        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
-        color=alt.Color(f'max({input_color}):Q',
+        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Trader")),
+        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="# of packages")),
+        color=alt.Color(f'sum({input_color}):Q',
                          legend=None,
                          scale=alt.Scale(scheme=input_color_theme)),
         stroke=alt.value('black'),
@@ -82,54 +71,35 @@ def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     )
     return heatmap
 
-# Choropleth map
-def make_choropleth(input_df, input_id, input_column, input_color_theme):
-    choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
-                                color_continuous_scale=input_color_theme,
-                                range_color=(0, input_df[input_column].max()),
-                                scope="usa",
-                                labels={input_column: 'Value'})
-    choropleth.update_layout(
-        template='plotly_dark',
-        plot_bgcolor='rgba(0, 0, 0, 0)',
-        paper_bgcolor='rgba(0, 0, 0, 0)',
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=350
-    )
-    return choropleth
+# Display total tax paid by each trader
+trader_tax_amount = data_import.groupby('Trader')['# of packages'].sum().reset_index()
+st.write("Total number of packages imported by Each Trader:")
+st.dataframe(trader_tax_amount)
 
-# Dashboard Main Panel
-col = st.columns((1.5, 4.5, 2), gap='medium')
+# Class distribution visualization
+class_distribution = data_import['Commercial / Brand Name'].value_counts()
+st.write("Class Distribution:")
+st.bar_chart(class_distribution)
 
-with col[0]:
-    st.markdown('#### Gains/Losses')
-    # Here you can add calculations for gains/losses if needed
-    
-    st.markdown('#### States Migration')
-    # You can add migration calculations here as necessary
+# Display selected data
+if df_selected.shape[0] > 0:
+    st.write("Selected Data:")
+    st.dataframe(df_selected)
 
-with col[1]:
-    st.markdown('#### Trader')
-    
-    # Trader is a relevant column
-    choropleth = make_choropleth(df_selected_month, 'Trader', '# of packages', selected_color_theme)
-    st.plotly_chart(choropleth, use_container_width=True)
-
-    # Heatmap for the number of packages by month
-    df_heatmap = df_selected_month.groupby(['Reg. date', '# of packages']).sum().reset_index()
-    heatmap = make_heatmap(df_heatmap, 'Reg. date', '# of packages', 'Commercial / Brand Name', selected_color_theme)
+    # Heatmap of the selected month
+    heatmap = make_heatmap(df_selected, 'Trader', '# of packages', '# of packages', selected_color_theme)
     st.altair_chart(heatmap, use_container_width=True)
+else:
+    st.write("No data available for the selected year and month.")
 
-with col[2]:
-    st.markdown('#### Top Traders')
-    
-    df_top_traders = df_selected_month.groupby('Trader')['# of packages'].sum().nlargest(10).reset_index()
-    st.dataframe(df_top_traders)
-    
-    with st.expander('About', expanded=True):
-        st.write('''
-            - Data: Import data related to chemical trading.
-            - :orange[**Gains/Losses**]: states with high inbound/outbound migration for selected year
-            - :orange[**States Migration**]: percentage of states with annual inbound/outbound migration > 50,000
-            ''')
-        
+# Provide options to download aggregate data
+if st.button('Download Trader Category Summary'):
+    trader_category_summary = df_selected.groupby(['Trader', 'Commercial / Brand Name']).size().reset_index(name='Count')
+    trader_category_summary.to_csv('../data/cleaned/trader_category_summary.csv', index=False)
+    st.success('Trader Category Summary downloaded successfully!')
+
+# About section
+with st.expander('About', expanded=True):
+    st.write('''
+        - Insights on traders, number of packages, and product categories.
+    ''')
